@@ -38,34 +38,6 @@ func safeToggleMouseRight(toggleTo string) {
 	}
 }
 
-func someButtonHeld(input controllers.Input) bool {
-	var holdables = config.Holdable()
-
-	var holding = false
-	for _, k := range holdables {
-
-		switch k {
-		case "bumper_right":
-			holding = holding || input.Right.Bumper
-		case "bumper_left":
-			holding = holding || input.Left.Bumper
-		case "a":
-			holding = holding || input.A
-		case "b":
-			holding = holding || input.B
-		case "x":
-			holding = holding || input.X
-		case "y":
-			holding = holding || input.Y
-		// TODO, fill out rest but probably refactor first
-		default:
-			continue
-		}
-
-	}
-	return holding
-}
-
 func main() {
 	err := glfw.Init()
 	if err != nil {
@@ -86,18 +58,32 @@ func main() {
 			continue
 		}
 
-		var holding = someButtonHeld(input)
-
-		if holding && !controllers.IsDeadZone(input.Right.Direction) && !controllers.IsDeadZone(input.Left.Direction) {
-			var angle = math.Atan2(input.Right.Direction.Y, input.Right.Direction.X)
-			var screenAdjustmentX = math.Cos(angle) * float64(config.AttackCircleRadius())
-			var screenAdjustmentY = math.Sin(angle) * float64(config.AttackCircleRadius())
-
+		if !controllers.IsDeadZone(input.Left.Direction) {
+			angle := math.Atan2(input.Left.Direction.Y, input.Left.Direction.X)
+			radius := float64(config.AttackCircleRadius())
+			xAdjust := math.Cos(angle) * radius
+			yAdjust := math.Sin(angle) * radius
 			robotgo.MoveMouse(
-				(int)(float64(config.ScreenWidth())/2+screenAdjustmentX)+config.CharacterOffsetX(),
-				(int)(float64(config.ScreenHeight())/2-screenAdjustmentY)-config.CharacterOffsetY(),
+				int(float64(config.ScreenWidth())/2+xAdjust)+config.CharacterOffsetX(),
+				int(float64(config.ScreenHeight())/2-yAdjust)-config.CharacterOffsetY(),
 			)
-			time.Sleep(50 * time.Millisecond)
+
+			safeToggleMouseLeft("down")
+		} else if controllers.IsDeadZone(input.Left.Direction) && !controllers.IsDeadZone(lastInput.Left.Direction) {
+			robotgo.MoveMouse(
+				int(float64(config.ScreenWidth())/2)+config.CharacterOffsetX(),
+				int(float64(config.ScreenHeight())/2)-config.CharacterOffsetY(),
+			)
+
+			safeToggleMouseLeft("up")
+		} else if !controllers.IsDeadZone(input.Right.Direction) {
+			safeToggleMouseLeft("up")
+
+			sens := float64(config.FreeMouseSensitivity())
+			var adjustX = input.Right.Direction.X * sens
+			var adjustY = -1 * input.Right.Direction.Y * sens
+
+			robotgo.MoveRelative(int(adjustX), int(adjustY))
 		}
 
 		if input.A_PRESS || input.A_UNPRESS {
@@ -147,46 +133,6 @@ func main() {
 		}
 		if input.DPad.Right_PRESS {
 			HandleMultiActions("dpad_right", false)
-		}
-
-		if !(holding && !controllers.IsDeadZone(input.Left.Direction) && !controllers.IsDeadZone(input.Right.Direction)) {
-			if controllers.IsDeadZone(input.Left.Direction) && !controllers.IsDeadZone(input.Right.Direction) {
-				safeToggleMouseLeft("up")
-
-				var screenAdjustmentX = input.Right.Direction.X * float64(config.FreeMouseSensitivity())
-				var screenAdjustmentY = -1 * input.Right.Direction.Y * float64(config.FreeMouseSensitivity())
-
-				robotgo.MoveRelative((int)(screenAdjustmentX), (int)(screenAdjustmentY))
-			} else if controllers.IsDeadZone(input.Left.Direction) {
-				safeToggleMouseLeft("up")
-				// robotgo.MoveMouse(
-				// 	(int)(SCREEN_RESOLUTION_X/2),
-				// 	(int)(SCREEN_RESOLUTION_Y/2),
-				// )
-			} else {
-				var angle = math.Atan2(input.Left.Direction.Y, input.Left.Direction.X)
-
-				var screenAdjustmentX = math.Cos(angle) * float64(config.WalkCircleRadius())
-				var screenAdjustmentY = math.Sin(angle) * float64(config.WalkCircleRadius())
-
-				if !holding {
-					safeToggleMouseLeft("down")
-				}
-
-				robotgo.DragMouse(
-					(int)(float64(config.ScreenWidth())/2+screenAdjustmentX)+config.CharacterOffsetX(),
-					(int)(float64(config.ScreenHeight())/2-screenAdjustmentY)-config.CharacterOffsetY(),
-				)
-			}
-		} else if holding && !controllers.IsDeadZone(input.Right.Direction) {
-			var angle = math.Atan2(input.Right.Direction.Y, input.Right.Direction.X)
-
-			var screenAdjustmentX = math.Cos(angle) * float64(config.WalkCircleRadius())
-			var screenAdjustmentY = math.Sin(angle) * float64(config.WalkCircleRadius())
-			robotgo.MoveMouse(
-				(int)(float64(config.ScreenWidth())/2+screenAdjustmentX)+config.CharacterOffsetX(),
-				(int)(float64(config.ScreenHeight())/2-screenAdjustmentY)-config.CharacterOffsetY(),
-			)
 		}
 
 		lastInput = input
